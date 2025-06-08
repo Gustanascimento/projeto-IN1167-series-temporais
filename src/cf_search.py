@@ -2,6 +2,7 @@
 # coding: utf-8
 import logging
 import os
+import pickle
 import time
 
 import warnings
@@ -229,17 +230,20 @@ def main():
             
         elif model_name == "sarimax":
             logger.info("Using SARIMAX model for forecasting")
-            forecast_model = pmdarima.auto_arima(
-                dataset.X_train.reshape(-1, n_features)
-            )
-             
+
+            model_pickle_path = f"{A.dataset}_sarimax_model.pkl"
+            if os.path.exists(model_pickle_path):
+                with open(model_pickle_path, "rb") as f:
+                    forecast_model = pickle.load(f)
+                logger.info(f"Loaded SARIMAX model from {model_pickle_path}")
+            else:
+                forecast_model = pmdarima.auto_arima(
+                    dataset.X_train.reshape(-1, n_features)
+                )
+                with open(model_pickle_path, "wb") as f:
+                    pickle.dump(forecast_model, f)
+                logger.info(f"Trained and saved SARIMAX model to {model_pickle_path}")           
             
-        elif model_name == "sarimax":
-            logger.info("Using SARIMAX model for forecasting")
-            forecast_model = pmdarima.auto_arima(
-                dataset.X_train.reshape(-1, n_features)
-            )
-             
         else:
             print("Not implemented: model_name.")
 
@@ -261,16 +265,6 @@ def main():
                 callbacks=[early_stopping],
             )
             Y_pred = forecast_model.predict(dataset.X_test)
-        
-        if model_name != "sarimax":
-            forecast_model.fit(
-                dataset.X_train,
-                dataset.Y_train,
-                epochs=100,
-                batch_size=128,
-                validation_data=(dataset.X_val, dataset.Y_val),
-                callbacks=[early_stopping],
-            )
 
         # Predict on the testing set (forecast)
         Y_pred = forecast_model.predict(len(dataset.Y_test))
