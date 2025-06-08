@@ -267,7 +267,7 @@ def main():
             Y_pred = forecast_model.predict(dataset.X_test)
         else:
             # Predict on the testing set (forecast)
-            Y_pred = forecast_model.predict(len(dataset.Y_test))
+            Y_pred = forecast_model.predict(len(dataset.X_test))
         mean_smape, mean_mase = forecast_metrics(dataset, Y_pred)
 
         logger.info(
