@@ -189,7 +189,7 @@ def main():
     if ablation_horizon is not None:
         horizon = ablation_horizon
 
-    for model_name in ["sarimax", "nbeats", "wavenet", "seq2seq", "gru"]:
+    for model_name in ["sarimax","nbeats", "wavenet", "seq2seq", "gru"]:
         # reset seeds for numpy, tensorflow, python random package and python environment seed
         reset_seeds(RANDOM_STATE)
         n_features = 1
@@ -265,9 +265,9 @@ def main():
                 callbacks=[early_stopping],
             )
             Y_pred = forecast_model.predict(dataset.X_test)
-
-        # Predict on the testing set (forecast)
-        Y_pred = forecast_model.predict(len(dataset.Y_test))
+        else:
+            # Predict on the testing set (forecast)
+            Y_pred = forecast_model.predict(len(dataset.Y_test))
         mean_smape, mean_mase = forecast_metrics(dataset, Y_pred)
 
         logger.info(
@@ -285,9 +285,9 @@ def main():
             random_state=RANDOM_STATE,
         )
         if model_name == "nbeats":
-            cf_model.fit(forecast_model.models["forecast"])
-        elif model_name in ["wavenet", "seq2seq", "gru"]:
-            cf_model.fit(forecast_model)
+            cf_model.fit(forecast_model.models["forecast"], model_name)
+        elif model_name in ["wavenet", "seq2seq", "gru", "sarimax"]:
+            cf_model.fit(forecast_model, model_name)
         else:
             print("Not implemented: cf_model.fit.")
 

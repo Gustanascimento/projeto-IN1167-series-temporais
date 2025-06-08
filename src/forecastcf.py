@@ -55,13 +55,14 @@ class ForecastCF:
         self.MISSING_MIN_BOUND = -np.inf
         self.model_ = None
 
-    def fit(self, model):
+    def fit(self, model, model_name):
         """Fit a new counterfactual explainer to the model parameters
         ----------
         model : keras.Model
             The model
         """
         self.model_ = model
+        self.model_name = model_name
         return self
 
     def predict(self, x):
@@ -78,6 +79,8 @@ class ForecastCF:
         masking_vector = tf.logical_not(
             tf.logical_and(prediction <= max_bound, prediction >= min_bound)
         )
+
+        #prediction.reshape(masking_vector)
         unmasked_preds = tf.boolean_mask(prediction, masking_vector)
 
         if unmasked_preds.shape == 0:
@@ -111,11 +114,13 @@ class ForecastCF:
     ):
         loss = tf.zeros(shape=())
         decoded = z_search
-        if (self.model_):
+        if (self.model_name != "sarimax"):
             pred = self.model_(decoded)
         else:
-             pred = self.model_.predict(decoded.numpy().size)
-             pred = tf.constant(pred)
+             pred = np.array([[self.model_.predict(decoded.numpy().size)]])
+             pred = tf.reshape(pred, (1,pred.size,1))
+             pred = tf.cast(pred, tf.float32)
+             
 
         #         kl_loss = tf.keras.losses.KLDivergence(reduction=tf.keras.losses.Reduction.SUM)
         #         y_true = tf.concat((original_sample, tf.expand_dims(self.model_(original_sample), axis=0)), axis=1)
