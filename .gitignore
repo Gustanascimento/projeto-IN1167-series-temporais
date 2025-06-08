@@ -67,7 +67,7 @@ target/
 .idea
 
 # VS Code
-.vscode/
+# .vscode/
 
 # Spyder
 .spyproject/
@@ -90,4 +90,4 @@ target/
 
 # Custom
 # Temporary user-defined
-.vscode/
+# .vscode/
