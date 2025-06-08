@@ -15,6 +15,7 @@ from nbeats_keras.model import NBeatsNet
 import tfts
 import pmdarima
 
+
 os.environ["TF_DETERMINISTIC_OPS"] = "1"
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -232,6 +233,13 @@ def main():
                 dataset.X_train.reshape(-1, n_features)
             )
              
+            
+        elif model_name == "sarimax":
+            logger.info("Using SARIMAX model for forecasting")
+            forecast_model = pmdarima.auto_arima(
+                dataset.X_train.reshape(-1, n_features)
+            )
+             
         else:
             print("Not implemented: model_name.")
 
@@ -252,9 +260,20 @@ def main():
                 validation_data=(dataset.X_val, dataset.Y_val),
                 callbacks=[early_stopping],
             )
+            Y_pred = forecast_model.predict(dataset.X_test)
+        
+        if model_name != "sarimax":
+            forecast_model.fit(
+                dataset.X_train,
+                dataset.Y_train,
+                epochs=100,
+                batch_size=128,
+                validation_data=(dataset.X_val, dataset.Y_val),
+                callbacks=[early_stopping],
+            )
 
         # Predict on the testing set (forecast)
-        Y_pred = forecast_model.predict(dataset.X_test)
+        Y_pred = forecast_model.predict(len(dataset.Y_test))
         mean_smape, mean_mase = forecast_metrics(dataset, Y_pred)
 
         logger.info(

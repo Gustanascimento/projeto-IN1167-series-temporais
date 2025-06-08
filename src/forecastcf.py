@@ -53,6 +53,7 @@ class ForecastCF:
 
         self.MISSING_MAX_BOUND = np.inf
         self.MISSING_MIN_BOUND = -np.inf
+        self.model_ = None
 
     def fit(self, model):
         """Fit a new counterfactual explainer to the model parameters
@@ -110,7 +111,11 @@ class ForecastCF:
     ):
         loss = tf.zeros(shape=())
         decoded = z_search
-        pred = self.model_(decoded)
+        if (self.model_):
+            pred = self.model_(decoded)
+        else:
+             pred = self.model_.predict(decoded.numpy().size)
+             pred = tf.constant(pred)
 
         #         kl_loss = tf.keras.losses.KLDivergence(reduction=tf.keras.losses.Reduction.SUM)
         #         y_true = tf.concat((original_sample, tf.expand_dims(self.model_(original_sample), axis=0)), axis=1)
