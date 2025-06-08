@@ -291,6 +291,11 @@ def load_dataset(dataset_name, data_path):
         df = data["interpolated"].apply(lambda x: np.asarray(json.loads(x)))
         df = np.asarray(df)
         df = np.stack(df, axis=0)
+        
+    elif dataset_name == "exchange_rate":
+        df = pd.read_csv(data_path + "exchange_rate.csv", header=0)
+        df = df.T
+        
     else:
         print("Not implemented.")
     return df

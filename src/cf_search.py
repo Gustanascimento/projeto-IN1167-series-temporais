@@ -13,6 +13,7 @@ import tensorflow as tf
 
 from nbeats_keras.model import NBeatsNet
 import tfts
+import pmdarima
 
 os.environ["TF_DETERMINISTIC_OPS"] = "1"
 config = tf.compat.v1.ConfigProto()
@@ -186,7 +187,7 @@ def main():
     if ablation_horizon is not None:
         horizon = ablation_horizon
 
-    for model_name in ["nbeats", "wavenet", "seq2seq", "gru"]:
+    for model_name in ["sarimax", "nbeats", "wavenet", "seq2seq", "gru"]:
         # reset seeds for numpy, tensorflow, python random package and python environment seed
         reset_seeds(RANDOM_STATE)
         n_features = 1
@@ -224,6 +225,13 @@ def main():
             # Definition of the objective function and the optimizer
             optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.0001)
             forecast_model.compile(optimizer=optimizer, loss="mae")
+            
+        elif model_name == "sarimax":
+            logger.info("Using SARIMAX model for forecasting")
+            forecast_model = pmdarima.auto_arima(
+                dataset.X_train.reshape(-1, n_features)
+            )
+             
         else:
             print("Not implemented: model_name.")
 
@@ -234,14 +242,16 @@ def main():
 
         # Train the model
         reset_seeds(RANDOM_STATE)
-        forecast_model.fit(
-            dataset.X_train,
-            dataset.Y_train,
-            epochs=100,
-            batch_size=128,
-            validation_data=(dataset.X_val, dataset.Y_val),
-            callbacks=[early_stopping],
-        )
+        
+        if model_name != "sarimax":
+            forecast_model.fit(
+                dataset.X_train,
+                dataset.Y_train,
+                epochs=100,
+                batch_size=128,
+                validation_data=(dataset.X_val, dataset.Y_val),
+                callbacks=[early_stopping],
+            )
 
         # Predict on the testing set (forecast)
         Y_pred = forecast_model.predict(dataset.X_test)
