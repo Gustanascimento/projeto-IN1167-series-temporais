@@ -117,7 +117,7 @@ class ForecastCF:
         if (self.model_name != "sarimax"):
             pred = self.model_(decoded)
         else:
-             pred = np.array([[self.model_.predict(decoded.numpy().size)]])
+             pred = np.array([[self.model_.predict(decoded.numpy().size-3)]])
              pred = tf.reshape(pred, (1,pred.size,1))
              pred = tf.cast(pred, tf.float32)
              
@@ -203,7 +203,12 @@ class ForecastCF:
                 x, z, step_weights, max_bound, min_bound
             )
 
-        pred = self.model_(z)
+        if (self.model_name != "sarimax"):
+            pred = self.model_(z)
+        else:
+             pred = np.array([[self.model_.predict(z.numpy().size-3)]])
+             pred = tf.reshape(pred, (1,pred.size,1))
+             pred = tf.cast(pred, tf.float32)
 
         # # uncomment for debug
         # print(
@@ -225,7 +230,12 @@ class ForecastCF:
                 )
             it += 1
 
-            pred = self.model_(z)
+            if (self.model_name != "sarimax"):
+                pred = self.model_(z)
+            else:
+                pred = np.array([[self.model_.predict(z.numpy().size-3)]])
+                pred = tf.reshape(pred, (1,pred.size,1))
+                pred = tf.cast(pred, tf.float32)
 
         # # uncomment for debug
         # print(
