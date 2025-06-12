@@ -117,7 +117,7 @@ class ForecastCF:
         if (self.model_name != "sarimax"):
             pred = self.model_(decoded)
         else:
-             pred = np.array([[self.model_.predict(decoded.numpy().size-3)]])
+             pred = np.array([[self.model_.predict(max_bound.size)]])
              pred = tf.reshape(pred, (1,pred.size,1))
              pred = tf.cast(pred, tf.float32)
              
