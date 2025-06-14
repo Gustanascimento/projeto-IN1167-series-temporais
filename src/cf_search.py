@@ -370,7 +370,7 @@ def main():
             elif model_name == "sarimax":
                     #size = int(((cf_samples_lst[i].size)/12))
                     z_preds=forecast_model.predict(cf_samples_lst[i].size)
-                    z_preds=np.array([[z_preds[i:i+12] for i in range(0,len(z_preds),15)]])
+                    z_preds=np.array([[z_preds[i:i+horizon] for i in range(0,len(z_preds),back_horizon)]])
                     z_preds=z_preds.reshape((z_preds.shape[1],z_preds.shape[2],1))                  
             else:
                 z_preds = forecast_model.predict(cf_samples_lst[i])
