@@ -17,6 +17,13 @@ import tfts
 import pmdarima
 
 
+# plots
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import pandas as pd
+
+
 os.environ["TF_DETERMINISTIC_OPS"] = "1"
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -25,15 +32,8 @@ session = tf.compat.v1.Session(config=config)
 warnings.filterwarnings(action="ignore", message="Setting attributes")
 
 from forecastcf import ForecastCF, BaselineShiftCF, BaselineNNCF
-from _helper import (
-    load_dataset,
-    remove_extra_dim,
-    add_extra_dim,
-    DataLoader,
-    MIMICDataLoader,
-    forecast_metrics,
-    cf_metrics,
-)
+# from _helper import (load_dataset, remove_extra_dim, add_extra_dim, DataLoader, MIMICDataLoader, forecast_metrics, cf_metrics)
+from _helper_multi import (load_dataset, remove_extra_dim, add_extra_dim, DataLoader, MIMICDataLoader, forecast_metrics, cf_metrics)
 from _utils import ResultWriter, reset_seeds
 
 
@@ -157,50 +157,56 @@ def main():
     # ## 1. Load data
     ###############################################
     data_path = "./data/"
+    
     df = load_dataset(A.dataset, data_path)
-    logger.info(f"The shape of loaded dataset: {df.shape}")
-
-    # ### 1.1 Data pre-processing
-    back_horizon = A.back_horizon
-    horizon = A.horizon
+    y = df.T.to_numpy()
+    if y.ndim == 2:
+        y = y[np.newaxis, :, :]
+    n_features = y.shape[2]
+    
     ablation_horizon = A.ablation_horizon
-    (train_size, val_size, test_size) = A.split_size
+    back_horizon = A.back_horizon
 
-    if A.dataset == "mimic":
-        dataset = MIMICDataLoader(horizon, back_horizon)
-        dataset.preprocessing(df, normalize=True, ablation_horizon=ablation_horizon)
-    else:
-        dataset = DataLoader(horizon, back_horizon)
-        # TODO: val_size * total_steps (should not) <= back_horizon + horizon
-        dataset.preprocessing(
-            df.values,
-            train_size=train_size,
-            val_size=val_size,
-            normalize=True,
-            sequence_stride=A.stride_size,
-            ablation_horizon=ablation_horizon,
-        )
+    dataset = DataLoader(A.horizon, A.back_horizon)
+    dataset.preprocessing_multi(
+        y,
+        n_features=n_features,
+        train_size=A.split_size[0],
+        val_size=A.split_size[1],
+        normalize=True,
+        sequence_stride=A.stride_size,
+        ablation_horizon=A.ablation_horizon
+    )
 
-    print(dataset.X_train.shape, dataset.Y_train.shape)
-    print(dataset.X_val.shape, dataset.Y_val.shape)
-    print(dataset.X_test.shape, dataset.Y_test.shape)
-
+    
+    logger.info(f"Data pre-processed, with {dataset.X_train.shape[0]} training samples, {dataset.X_val.shape[0]} validation samples, and {dataset.X_test.shape[0]} testing samples.")
+    logger.info(f"Data shape: {dataset.X_train.shape}, {dataset.Y_train.shape}.")
+    logger.info(f"Data shape: {dataset.X_val.shape}, {dataset.Y_val.shape}.")
+    logger.info(f"Data shape: {dataset.X_test.shape}, {dataset.Y_test.shape}.")
+    logger.info(f"Number of features: {n_features}.")
+    
     # Ablation: Use `ablation_horizon`` as the horizon parameter after training/val/testing splits
     if ablation_horizon is not None:
         horizon = ablation_horizon
 
-    for model_name in ["sarimax","nbeats", "wavenet", "seq2seq", "gru"]:
-        # reset seeds for numpy, tensorflow, python random package and python environment seed
+    # for model_name in ["sarimax","nbeats", "wavenet", "seq2seq", "gru"]:
+    
+    # a princípio testando somente GRU pra multivariada
+    
+    for model_name in ["gru"]:
         reset_seeds(RANDOM_STATE)
-        n_features = 1
+        
+        if (model_name == "sarimax" and n_features > 1):
+            logger.warning("SARIMAX model is not suitable for multivariate time series. Skipping this model.")
+            continue
 
         ###############################################
         # ## 2.0 Forecasting model
         ###############################################
-        # reset seeds for numpy, tensorflow, python random package and python environment seed
-        reset_seeds(RANDOM_STATE)
+
         if model_name in ["wavenet", "seq2seq"]:
             forecast_model = build_tfts_model(model_name, back_horizon, horizon)
+            
         elif model_name == "nbeats":
             forecast_model = NBeatsNet(
                 stack_types=(NBeatsNet.GENERIC_BLOCK, NBeatsNet.GENERIC_BLOCK),
@@ -212,7 +218,8 @@ def main():
             # Definition of the objective function and the optimizer
             optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.0001)
             forecast_model.compile(optimizer=optimizer, loss="mae")
-        elif model_name == "gru":
+            
+        elif (model_name == "gru" and n_features == 1):
             forecast_model = tf.keras.models.Sequential(
                 [
                     # Shape [batch, time, features] => [batch, time, gru_units]
@@ -223,10 +230,50 @@ def main():
                     tf.keras.layers.Reshape((horizon, 1)),
                 ]
             )
-
             # Definition of the objective function and the optimizer
             optimizer = tf.keras.optimizers.legacy.Adam(learning_rate=0.0001)
             forecast_model.compile(optimizer=optimizer, loss="mae")
+        
+        elif model_name == "gru" and n_features > 1:
+            # multivariáveis 
+            
+            forecast_model = tf.keras.Sequential()
+
+            forecast_model.add(
+                tf.keras.layers.GRU(
+                    200,
+                    activation="tanh",
+                    input_shape=(back_horizon, n_features),
+                    return_sequences=False  # último output do encoder
+                )
+            )
+
+            forecast_model.add(tf.keras.layers.RepeatVector(horizon))  # repete para sequência de saída
+
+            forecast_model.add(
+                tf.keras.layers.GRU(
+                    200,
+                    activation="tanh",
+                    return_sequences=True  # output sequência
+                )
+            )
+
+            forecast_model.add(tf.keras.layers.Dropout(0.5))
+
+            forecast_model.add(
+                tf.keras.layers.TimeDistributed(
+                    tf.keras.layers.Dense(n_features, activation="linear")  # saída multivariada
+                )
+            )
+
+            forecast_model.compile(
+                loss="mean_squared_error",
+                metrics=["mae", "mse"],
+                optimizer=tf.keras.optimizers.Adam()
+            )
+
+            forecast_model.summary()
+
             
         elif model_name == "sarimax":
             logger.info("Using SARIMAX model for forecasting")
@@ -268,6 +315,7 @@ def main():
         else:
             # Predict on the testing set (forecast)
             Y_pred = forecast_model.predict(dataset.X_test.shape[0])
+            
         mean_smape, mean_mase = forecast_metrics(dataset, Y_pred)
 
         logger.info(
@@ -393,6 +441,12 @@ def main():
                 input_indices,
                 label_indices,
             )
+            
+            # Plots
+            
+            plot_horizon_test_graphs_plotly()
+            plot_ablation_study_graphs_plotly()
+            
 
             logger.info(f"Done for CF search: [[{CF_MODEL_NAMES[i]}]].")
             logger.info(f"validity: {validity}, step_validity_auc: {cumsum_auc}.")
@@ -416,6 +470,107 @@ def main():
                 step_validity_auc=cumsum_auc,
             )
     logger.info("Done.")
+    
+
+
+
+    def plot_horizon_test_graphs_plotly(results_file='results/results_horizon_test.csv'):
+        """
+        Generates plots for the horizon test (Figure 3) using Plotly.
+        """
+        try:
+            data = pd.read_csv(results_file)
+        except FileNotFoundError:
+            print(f"Error: The file {results_file} was not found.")
+            return
+
+        # Unpivot the dataframe to make it suitable for plotting with Plotly Express
+        metrics_to_plot = ['validity_ratio', 'step_validity_auc', 'proximity', 'compactness']
+        data_melted = data.melt(
+            id_vars=['dataset', 'forecast_model', 'horizon'],
+            value_vars=metrics_to_plot,
+            var_name='metric',
+            value_name='value'
+        )
+
+        # Create a faceted plot for each dataset
+        fig = px.line(
+            data_melted,
+            x='horizon',
+            y='value',
+            color='forecast_model',
+            line_dash='metric',
+            facet_col='dataset',
+            facet_col_wrap=3, # Adjust wrapping as needed
+            title='Horizon Test by Dataset',
+            labels={'value': 'Metric Value', 'horizon': 'Forecast Horizon'}
+        )
+        fig.update_yaxes(matches=None) # Allow y-axes to have different scales
+        fig.show()
+
+
+    def plot_ablation_study_graphs_plotly(results_file_cp='results/results_ablation_desired_change.csv', results_file_fr='results/results_ablation_fraction_std.csv'):
+        """
+        Generates plots for the ablation studies (Figures 4 & 5) using Plotly.
+        """
+        metrics = ['validity_ratio', 'step_validity_auc', 'proximity', 'compactness']
+        models = ['n-beats', 'wavenet', 'seq2seq', 'gru']
+
+        # --- Figure 4: Desired Change (cp) ---
+        try:
+            data_cp = pd.read_csv(results_file_cp)
+            fig_cp = make_subplots(
+                rows=2, cols=2,
+                subplot_titles=metrics,
+                vertical_spacing=0.1,
+                horizontal_spacing=0.05
+            )
+
+            for i, metric in enumerate(metrics):
+                for model in models:
+                    model_data = data_cp[data_cp['forecast_model'] == model]
+                    fig_cp.add_trace(
+                        go.Scatter(x=model_data['desired_change'], y=model_data[metric], mode='lines', name=model),
+                        row=(i // 2) + 1, col=(i % 2) + 1
+                    )
+
+            fig_cp.update_layout(
+                title_text="Ablation Study: Desired Change Percent (cp)",
+                height=700,
+                showlegend=False
+            )
+            fig_cp.show()
+
+        except FileNotFoundError:
+            print(f"Error: The file {results_file_cp} was not found.")
+
+
+        # --- Figure 5: Fraction of Standard Deviation (fr) ---
+        try:
+            data_fr = pd.read_csv(results_file_fr)
+            fig_fr = make_subplots(
+                rows=2, cols=2,
+                subplot_titles=metrics,
+                vertical_spacing=0.1,
+                horizontal_spacing=0.05
+            )
+
+            for i, metric in enumerate(metrics):
+                for model in models:
+                    model_data = data_fr[data_fr['forecast_model'] == model]
+                    fig_fr.add_trace(
+                        go.Scatter(x=model_data['fraction_std'], y=model_data[metric], mode='lines', name=model),
+                        row=(i // 2) + 1, col=(i % 2) + 1
+                    )
+            fig_fr.update_layout(
+                title_text="Ablation Study: Fraction of Standard Deviation (fr)",
+                height=700,
+                showlegend=False
+            )
+            fig_fr.show()
+
+        except FileNotFoundError:
+            print(f"Error: The file {results_file_fr} was not found.")
 
 
 def build_tfts_model(model_name, back_horizon, horizon):
