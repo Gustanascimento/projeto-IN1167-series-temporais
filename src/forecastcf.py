@@ -91,12 +91,12 @@ class ForecastCF:
         )
 
         if tf.reduce_any(max_bound != self.MISSING_MAX_BOUND):
-            dist_max = mse_loss_(max_bound, unmasked_preds)
+            dist_max = mse_loss_((max_bound.shape[0] * max_bound.shape[1]), unmasked_preds)
         else:
             dist_max = 0
 
         if tf.reduce_any(min_bound != self.MISSING_MIN_BOUND):
-            dist_min = mse_loss_(min_bound, unmasked_preds)
+            dist_min = mse_loss_((min_bound.shape[0] * min_bound.shape[1]), unmasked_preds)
         else:
             dist_min = 0
 
@@ -302,7 +302,7 @@ class BaselineNNCF:
             ]
         )
         closest_idx = self.nn_model_.kneighbors(
-            remove_extra_dim(desired_preds), return_distance=False
+            desired_preds.reshape(desired_preds.shape[0], desired_preds.shape[1] * desired_preds.shape[2]), return_distance=False
         )
         result_samples = self.train_samples[remove_extra_dim(closest_idx)]
         return add_extra_dim(result_samples)

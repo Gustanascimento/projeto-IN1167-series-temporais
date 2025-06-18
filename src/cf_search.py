@@ -18,9 +18,9 @@ import pmdarima
 
 
 # plots
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+#import plotly.express as px
+#import plotly.graph_objects as go
+#from plotly.subplots import make_subplots
 import pandas as pd
 
 
@@ -395,8 +395,8 @@ def main():
         cf_model_bl2 = BaselineNNCF()
         start_time = time.time()
         cf_model_bl2.fit(
-            X_train=remove_extra_dim(dataset.X_train),
-            Y_train=remove_extra_dim(dataset.Y_train),
+            X_train=dataset.X_train.reshape((dataset.X_train.shape[0], dataset.X_train.shape[1] * dataset.X_train.shape[2])),
+            Y_train=dataset.Y_train.reshape((dataset.Y_train.shape[0], dataset.Y_train.shape[1] * dataset.Y_train.shape[2]))
         )
         cf_samples_bl2 = cf_model_bl2.transform(desired_max_lst, desired_min_lst)
         end_time = time.time()
@@ -406,7 +406,7 @@ def main():
         ###############################################
         # ## 2.3 CF evaluation
         ###############################################
-        input_indices = range(0, back_horizon)
+        input_indices = [range(0, back_horizon), range(0,n_features)]
         label_indices = range(back_horizon, back_horizon + horizon)
         cf_samples_lst = [cf_samples, cf_samples_bl, cf_samples_bl2]
         CF_MODEL_NAMES = ["ForecastCF", "BaseShift", "BaseNN"]
@@ -430,8 +430,8 @@ def main():
                 cumsum_valid_steps,
                 cumsum_counts,
                 cumsum_auc,
-                slope_diff,
-                slope_diff_preds,
+                #slope_diff,
+                #slope_diff_preds,
             ) = cf_metrics(
                 desired_max_lst,
                 desired_min_lst,
@@ -444,8 +444,8 @@ def main():
             
             # Plots
             
-            plot_horizon_test_graphs_plotly()
-            plot_ablation_study_graphs_plotly()
+            #plot_horizon_test_graphs_plotly()
+            #plot_ablation_study_graphs_plotly()
             
 
             logger.info(f"Done for CF search: [[{CF_MODEL_NAMES[i]}]].")
@@ -620,7 +620,7 @@ def polynomial_values(shift, change_percent, poly_order, horizon):
 
     p = np.polynomial.Polynomial(p_orders)
     p_coefs = list(reversed(p.coef))
-    value_lst = np.asarray([np.polyval(p_coefs, i) for i in range(horizon)])
+    value_lst = np.asarray([[np.polyval(p_coefs, i) for x in range(8)] for i in range(horizon)])
 
     return value_lst
 
@@ -644,22 +644,18 @@ def generate_bounds(
 
     std = np.std(input_series)
 
-    upper = add_extra_dim(
-        start_value
-        * (
+    upper = start_value * (
             1
             + polynomial_values(shift, change_percent, poly_order, horizon)
             + fraction_std * std
         )
-    )
-    lower = add_extra_dim(
-        start_value
-        * (
+    
+    lower =start_value * (
             1
             + polynomial_values(shift, change_percent, poly_order, horizon)
             - fraction_std * std
         )
-    )
+    
 
     return upper, lower
 
