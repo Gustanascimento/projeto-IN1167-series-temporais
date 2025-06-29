@@ -58,12 +58,25 @@ class ForecastCF:
 
 # (The Baseline classes remain the same)
 class BaselineShiftCF:
-    def fit(self, X_train, Y_train):
-        self.shift = np.mean(Y_train, axis=(0, 1)) - np.mean(X_train, axis=(0, 1))
-        return self
-    def transform(self, x, max_bound_lst, min_bound_lst):
-        return x + self.shift, None, None
+    def __init__(self, *, desired_percent_change):
+        """
+        Parameters
+        ----------
+        desired_percent_change : float, optional
+            The desired percent change of the counterfactual
+        """
+        self.desired_change = desired_percent_change
 
+    # TODO: compatible with the counterfactuals of wildboar
+    #       i.e., define the desired output target per label
+    def transform(self, x):
+        """Generate counterfactual explanations
+        x : array-like of shape [n_samples, n_timestep, n_dims]
+            The samples
+        """
+        result_samples = x * (1 + self.desired_change)
+        return result_samples
+        
 class BaselineNNCF:
     def __init__(self, n_neighbors=10):
         self.n_neighbors = n_neighbors

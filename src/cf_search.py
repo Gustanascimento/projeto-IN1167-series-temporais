@@ -18,9 +18,9 @@ import pmdarima
 
 
 # plots
-#import plotly.express as px
-#import plotly.graph_objects as go
-#from plotly.subplots import make_subplots
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import pandas as pd
 
 
@@ -31,151 +31,160 @@ session = tf.compat.v1.Session(config=config)
 
 warnings.filterwarnings(action="ignore", message="Setting attributes")
 
-from forecastcf import ForecastCF, BaselineShiftCF, BaselineNNCF
+from forecastcf_multi import ForecastCF, BaselineShiftCF, BaselineNNCF
 # from _helper import (load_dataset, remove_extra_dim, add_extra_dim, DataLoader, MIMICDataLoader, forecast_metrics, cf_metrics)
 from _helper_multi import (load_dataset, remove_extra_dim, add_extra_dim, DataLoader, MIMICDataLoader, forecast_metrics, cf_metrics)
 from _utils import ResultWriter, reset_seeds
 
 
 def main():
-    parser = ArgumentParser(
-        description="Run this script to evaluate ForecastCF method."
-    )
-    parser.add_argument(
-        "--dataset", type=str, help="Dataset that the experiment is running on."
-    )
-    parser.add_argument(
-        "--horizon",
-        type=int,
-        required=True,
-        help="The horizon of the forecasting task.",
-    )
-    parser.add_argument(
-        "--back-horizon",
-        type=int,
-        required=True,
-        help="The back horizon of the forecasting task",
-    )
-    parser.add_argument(
-        "--split-size",
-        nargs="+",
-        type=float,
-        default=[0.6, 0.2, 0.2],
-        help="Split size for training/validation/testing following the temporal order, by default [0.6, 0.2, 0.2]",
-    )
-    parser.add_argument(
-        "--stride-size",
-        type=int,
-        default=1,
-        help="The sequence stride size when creating sequences from train/val/test, by default 1.",
-    )
-    parser.add_argument(
-        "--center",
-        type=str,
-        default="median",
-        help="The center parameter: the desired change's start value, by default 'median'.",
-    )
-    parser.add_argument(
-        "--desired-shift",
-        type=float,
-        required=True,
-        default=0,
-        help="Desired shift value compared to the center, e.g., 0.2 (indicating 120% of the center value).",
-    )
-    parser.add_argument(
-        "--desired-change",
-        type=float,
-        required=True,
-        help="Desired increase/decrease trend parameter, e.g., 0.1, or -0.1",
-    )
-    parser.add_argument(
-        "--poly-order",
-        type=int,
-        required=True,
-        help="Desired poly function order, e.g., 1, 2, ...",
-    )
-    parser.add_argument(
-        "--fraction-std",
-        type=float,
-        default=1,
-        help="Fraction of standard deviation into creating the bound, e.g., 1, 1.5, 2, ...",
-    )
-    parser.add_argument(
-        "--ablation-horizon",
-        type=int,
-        default=None,
-        help="Ablation horizon parameter, for fixing the proportion of training sequences across different horizons.",
-    )
-    parser.add_argument(
-        "--random-test",
-        action="store_true",
-        default=False,
-        help="Boolean flag of using random 1000 samples from test set, default False.",
-    )
-    parser.add_argument(
-        "--random-seed",
-        type=int,
-        default=39,
-        help="Random seed parameter, default 39.",
-    )
-    parser.add_argument(
-        "--runtime-test",
-        action="store_true",
-        default=False,
-        help="Boolean flag of runtime test using random 50 samples from test set, default False.",
-    )
-    parser.add_argument("--output", type=str, help="Output file name.")
-    A = parser.parse_args()
+    # parser = ArgumentParser(
+    #     description="Run this script to evaluate ForecastCF method."
+    # )
+    # parser.add_argument(
+    #     "--dataset", type=str, help="Dataset that the experiment is running on."
+    # )
+    # parser.add_argument(
+    #     "--horizon",
+    #     type=int,
+    #     required=True,
+    #     help="The horizon of the forecasting task.",
+    # )
+    # parser.add_argument(
+    #     "--back-horizon",
+    #     type=int,
+    #     required=True,
+    #     help="The back horizon of the forecasting task",
+    # )
+    # parser.add_argument(
+    #     "--split-size",
+    #     nargs="+",
+    #     type=float,
+    #     default=[0.6, 0.2, 0.2],
+    #     help="Split size for training/validation/testing following the temporal order, by default [0.6, 0.2, 0.2]",
+    # )
+    # parser.add_argument(
+    #     "--stride-size",
+    #     type=int,
+    #     default=1,
+    #     help="The sequence stride size when creating sequences from train/val/test, by default 1.",
+    # )
+    # parser.add_argument(
+    #     "--center",
+    #     type=str,
+    #     default="median",
+    #     help="The center parameter: the desired change's start value, by default 'median'.",
+    # )
+    # parser.add_argument(
+    #     "--desired-shift",
+    #     type=float,
+    #     required=True,
+    #     default=0,
+    #     help="Desired shift value compared to the center, e.g., 0.2 (indicating 120% of the center value).",
+    # )
+    # parser.add_argument(
+    #     "--desired-change",
+    #     type=float,
+    #     required=True,
+    #     help="Desired increase/decrease trend parameter, e.g., 0.1, or -0.1",
+    # )
+    # parser.add_argument(
+    #     "--poly-order",
+    #     type=int,
+    #     required=True,
+    #     help="Desired poly function order, e.g., 1, 2, ...",
+    # )
+    # parser.add_argument(
+    #     "--fraction-std",
+    #     type=float,
+    #     default=1,
+    #     help="Fraction of standard deviation into creating the bound, e.g., 1, 1.5, 2, ...",
+    # )
+    # parser.add_argument(
+    #     "--ablation-horizon",
+    #     type=int,
+    #     default=None,
+    #     help="Ablation horizon parameter, for fixing the proportion of training sequences across different horizons.",
+    # )
+    # parser.add_argument(
+    #     "--random-test",
+    #     action="store_true",
+    #     default=False,
+    #     help="Boolean flag of using random 1000 samples from test set, default False.",
+    # )
+    # parser.add_argument(
+    #     "--random-seed",
+    #     type=int,
+    #     default=39,
+    #     help="Random seed parameter, default 39.",
+    # )
+    # parser.add_argument(
+    #     "--runtime-test",
+    #     action="store_true",
+    #     default=False,
+    #     help="Boolean flag of runtime test using random 50 samples from test set, default False.",
+    # )
+    # parser.add_argument("--output", type=str, help="Output file name.")
+    #A = parser.parse_args()
 
     logger = logging.getLogger(__name__)
     logging.getLogger("matplotlib.font_manager").disabled = True
     logger.info(f"Num GPUs Available: {len(tf.config.list_physical_devices('GPU'))}.")
-    logger.info(f"Split size: {A.split_size}.")  # for debugging
-    logger.info(f"Ablation horizon: {A.ablation_horizon}.")  # for debugging
+    #logger.info(f"Split size: {A.split_size}.")  # for debugging
+    #logger.info(f"Ablation horizon: {A.ablation_horizon}.")  # for debugging
 
     # desired starting center, desired shift, and desired change & fraction of std (bound widths)
-    center, desired_shift = A.center.lower(), A.desired_shift
-    poly_order = A.poly_order
-    desired_change, fraction_std = A.desired_change, A.fraction_std
+    #center, desired_shift = A.center.lower(), A.desired_shift
+    #poly_order = A.poly_order
+    #desired_change, fraction_std = A.desired_change, A.fraction_std
+
+    center, desired_shift = 'median', 0
+    poly_order = 1
+    desired_change, fraction_std = 0.1, 1
 
     logger.info(f"===========Desired trend parameters=============")
     logger.info(f"center: {center}, desired_shift: {desired_shift};")
     logger.info(f"fraction_std:{fraction_std};")
     logger.info(f"desired_change:{desired_change}, poly_order:{poly_order}.")
 
-    RANDOM_STATE = A.random_seed
-    result_writer = ResultWriter(file_name=A.output, dataset_name=A.dataset)
+    #RANDOM_STATE = A.random_seed
+    #result_writer = ResultWriter(file_name=A.output, dataset_name=A.dataset)
+    RANDOM_STATE = 1
+    result_writer = ResultWriter(file_name='output.csv', dataset_name='exchange_rate')
 
     logger.info(f"===========Random seed setup=============")
     logger.info(f"Random seed: {RANDOM_STATE}.")
-    logger.info(f"Result writer is ready, writing to {A.output}...")
+    #logger.info(f"Result writer is ready, writing to {A.output}...")
     # If `A.output` file already exists, no need to write head (directly append)
-    if not os.path.isfile(A.output):
+    if not os.path.isfile('output.csv'):
         result_writer.write_head()
 
     ###############################################
     # ## 1. Load data
     ###############################################
-    data_path = "./data/"
+    data_path = "/home/camarilla/counterfactual-explanations-for-forecasting/data/"
     
-    df = load_dataset(A.dataset, data_path)
+    #df = load_dataset(A.dataset, data_path)
+    df = load_dataset('exchange_rate', data_path)
     y = df.T.to_numpy()
     if y.ndim == 2:
         y = y[np.newaxis, :, :]
     n_features = y.shape[2]
     
-    ablation_horizon = A.ablation_horizon
-    back_horizon = A.back_horizon
+    #ablation_horizon = A.ablation_horizon
+    #back_horizon = A.back_horizon
+    ablation_horizon = 6
+    back_horizon = 18
 
-    dataset = DataLoader(A.horizon, A.back_horizon)
+    dataset = DataLoader(6, 18)
     dataset.preprocessing_multi(
         y,
         n_features=n_features,
-        train_size=A.split_size[0],
-        val_size=A.split_size[1],
+        train_size=0.75,
+        val_size=0.15,
         normalize=True,
-        sequence_stride=A.stride_size,
-        ablation_horizon=A.ablation_horizon
+        sequence_stride=1,
+        ablation_horizon=6
     )
 
     
@@ -213,6 +222,8 @@ def main():
                 forecast_length=horizon,
                 backcast_length=back_horizon,
                 hidden_layer_units=256,
+                input_dim = 8,
+                output_dim = 8
             )
 
             # Definition of the objective function and the optimizer
@@ -329,7 +340,7 @@ def main():
             max_iter=100,
             optimizer=tf.keras.optimizers.legacy.Adam(learning_rate=0.001),
             pred_margin_weight=0.25,
-            step_weights=np.ones((1, dataset.X_train.shape[1], n_features)),
+            #step_weights=np.ones((1, dataset.X_train.shape[1], n_features)),
             random_state=RANDOM_STATE,
         )
         if model_name == "nbeats":
@@ -342,13 +353,13 @@ def main():
         # loss calculation ==> min/max bounds
         desired_max_lst, desired_min_lst = list(), list()
 
-        if A.random_test == True:
+        if False:
             # use a subset of the test, especially for large dataset (e.g., M4)
             np.random.seed(RANDOM_STATE)
             rand_test_idx = np.random.choice(
                 dataset.X_test.shape[0], 1000, replace=False
             )
-        elif A.runtime_test == True:
+        elif False:
             # use a subset of the test
             np.random.seed(RANDOM_STATE)
             rand_test_idx = np.random.choice(dataset.X_test.shape[0], 50, replace=False)
@@ -392,36 +403,45 @@ def main():
         elapsed_time2 = end_time - start_time
         logger.info(f"Elapsed time - BaseShift: {elapsed_time2:0.4f}.")
 
-        cf_model_bl2 = BaselineNNCF()
-        start_time = time.time()
-        cf_model_bl2.fit(
-            X_train=dataset.X_train.reshape((dataset.X_train.shape[0], dataset.X_train.shape[1] * dataset.X_train.shape[2])),
-            Y_train=dataset.Y_train.reshape((dataset.Y_train.shape[0], dataset.Y_train.shape[1] * dataset.Y_train.shape[2]))
-        )
-        cf_samples_bl2 = cf_model_bl2.transform(desired_max_lst, desired_min_lst)
-        end_time = time.time()
-        elapsed_time3 = end_time - start_time
-        logger.info(f"Elapsed time - BaseNN: {elapsed_time3:0.4f}.")
+        #cf_model_bl2 = BaselineNNCF()
+        #start_time = time.time()
+       # cf_model_bl2.fit(
+       #     X_train=dataset.X_train.reshape((dataset.X_train.shape[0], dataset.X_train.shape[1] * dataset.X_train.shape[2])),
+       #     Y_train=dataset.Y_train.reshape((dataset.Y_train.shape[0], dataset.Y_train.shape[1] * dataset.Y_train.shape[2]))
+      #  )
+       # cf_samples_bl2 = cf_model_bl2.transform(desired_max_lst, desired_min_lst)
+       # end_time = time.time()
+        #elapsed_time3 = end_time - start_time
+        #logger.info(f"Elapsed time - BaseNN: {elapsed_time3:0.4f}.")
 
         ###############################################
         # ## 2.3 CF evaluation
         ###############################################
         input_indices = [range(0, back_horizon), range(0,n_features)]
         label_indices = range(back_horizon, back_horizon + horizon)
-        cf_samples_lst = [cf_samples, cf_samples_bl, cf_samples_bl2]
-        CF_MODEL_NAMES = ["ForecastCF", "BaseShift", "BaseNN"]
+        #cf_samples_lst = [cf_samples, cf_samples_bl, cf_samples_bl2]
+        #CF_MODEL_NAMES = ["ForecastCF", "BaseShift", "BaseNN"]
+        #cf_samples_lst = [cf_samples, cf_samples_bl]
+        cf_samples_lst = [cf_samples, cf_samples_bl]
+        CF_MODEL_NAMES = ["ForecastCF", "BaseShift"]
 
         for i in range(len(cf_samples_lst)):
             # predicted probabilities of CFs
             if model_name == "nbeats":
-                z_preds = forecast_model.models["forecast"].predict(cf_samples_lst[i])
+                if cf_samples_lst[i].shape == (1,240,1):
+                    z_preds = forecast_model.models["forecast"].predict(cf_samples_lst[i].reshape(1,30,8))
+                else:    
+                    z_preds = forecast_model.models["forecast"].predict(cf_samples_lst[i])
             elif model_name == "sarimax":
                     #size = int(((cf_samples_lst[i].size)/12))
                     z_preds=forecast_model.predict(cf_samples_lst[i].size)
                     z_preds=np.array([[z_preds[i:i+horizon] for i in range(0,len(z_preds),back_horizon)]])
                     z_preds=z_preds.reshape((z_preds.shape[1],z_preds.shape[2],1))                  
             else:
-                z_preds = forecast_model.predict(cf_samples_lst[i])
+                if cf_samples_lst[i].shape == (1,120,1):
+                    z_preds = forecast_model.predict(cf_samples_lst[i].reshape(1,15,8))
+                else:    
+                    z_preds = forecast_model.predict(cf_samples_lst[i])
 
             (
                 validity,
@@ -444,8 +464,9 @@ def main():
             
             # Plots
             
-            #plot_horizon_test_graphs_plotly()
-            #plot_ablation_study_graphs_plotly()
+            #self.plot_horizon_test_graphs_plotly()
+            #self.plot_ablation_study_graphs_plotly()
+           
             
 
             logger.info(f"Done for CF search: [[{CF_MODEL_NAMES[i]}]].")
@@ -459,7 +480,7 @@ def main():
                 random_seed=RANDOM_STATE,
                 method_name=model_name,
                 cf_method_name=CF_MODEL_NAMES[i],
-                horizon=A.ablation_horizon,
+                horizon=15,
                 desired_change=desired_change,
                 fraction_std=fraction_std,
                 forecast_smape=mean_smape,
@@ -469,12 +490,59 @@ def main():
                 compactness=compactness,
                 step_validity_auc=cumsum_auc,
             )
+
+            #plot_timeseries_with_forecasts(
+            #        desired_max_lst,
+            #        desired_min_lst,
+            #        X_test,
+            #        cf_samples_lst[0],
+            #        z_preds,
+            #        dataset
+            #    )
     logger.info("Done.")
     
+import plotly.graph_objects as go
+
+def plot_timeseries_with_forecasts(max_bound,min_bound,x_test,cf_samples,z_preds,dataset):
+        
+        for x in range(8):
+            fig = go.Figure()
+            df = pd.DataFrame({'col': dataset.scaler[0][x].inverse_transform(x_test[0][:,x].reshape(-1,1)).flatten()})
+            df['col2'] = dataset.scaler[0][x].inverse_transform(cf_samples[0][:,x].reshape(-1,1)).flatten()
+            #df = pd.concat([df,df2])
+            # Original series
+            fig.add_trace(go.Scatter(y=df['col'], mode='lines', name='t1', line=dict()))
+            fig.add_trace(go.Scatter(y=df['col2'], mode='lines', name='t2', line=dict()))
+            #fig.write_image('plottest.png')
+            
+            #fig.show()
+
+            df2 = pd.DataFrame({'col': dataset.scaler[0][x].inverse_transform(z_preds[0][:,x].reshape(-1,1)).flatten()})
+            #df2['col2'] = dataset.scaler[0][0].inverse_transform(cf_samples[0][:,0].reshape(-1,1)).flatten() 
+            # Forecast series
+            fig.add_trace(go.Scatter(x=list(range(18,24)), y=df2['col'], mode='lines', name='Y1 Forecast', line=dict(dash='dot')))
+            #fig.add_trace(go.Scatter(x=df[x_col], y=df[y2_forecast_col], mode='lines', name='Y2 Forecast', line=dict(color='green', dash='dot')))
+
+            #fig.show()
+
+            df3 = pd.DataFrame({'col': dataset.scaler[0][x].inverse_transform(max_bound[0][:,x].reshape(-1,1)).flatten()})
+            df3['col2'] = dataset.scaler[0][0].inverse_transform(min_bound[0][:,x].reshape(-1,1)).flatten()
+
+            # Bounds
+            fig.add_trace(go.Scatter(x=list(range(18,24)), y=df3['col'], mode='lines', name='Max Bound', line=dict( dash='dash')))
+            fig.add_trace(go.Scatter(x=list(range(18,24)), y=df3['col2'], mode='lines', name='Min Bound', line=dict( dash='dash')))
+
+            fig.update_layout(
+                title='Series with Forecasts and Bounds',
+                xaxis_title='X',
+                yaxis_title='Value',
+                template='plotly_white'
+            )
+
+            fig.show()
 
 
-
-    def plot_horizon_test_graphs_plotly(results_file='results/results_horizon_test.csv'):
+def plot_horizon_test_graphs_plotly(results_file='results/results_horizon_test.csv'):
         """
         Generates plots for the horizon test (Figure 3) using Plotly.
         """
@@ -509,7 +577,7 @@ def main():
         fig.show()
 
 
-    def plot_ablation_study_graphs_plotly(results_file_cp='results/results_ablation_desired_change.csv', results_file_fr='results/results_ablation_fraction_std.csv'):
+def plot_ablation_study_graphs_plotly(results_file_cp='results/results_ablation_desired_change.csv', results_file_fr='results/results_ablation_fraction_std.csv'):
         """
         Generates plots for the ablation studies (Figures 4 & 5) using Plotly.
         """
@@ -574,7 +642,7 @@ def main():
 
 
 def build_tfts_model(model_name, back_horizon, horizon):
-    n_features = 1
+    n_features = 8
 
     inputs = tf.keras.layers.Input([back_horizon, n_features])
     if model_name == "wavenet":
@@ -591,7 +659,7 @@ def build_tfts_model(model_name, back_horizon, horizon):
         backbone = tfts.AutoModel(
             "seq2seq",
             predict_length=horizon,
-            custom_model_params={"rnn_size": 256, "dense_size": 256},
+            custom_model_params={"rnn_size": 256, "dense_size": 256, "output_dim" : 8},
         )
     else:
         print("Not implemented: build_tfts_model.")
@@ -632,9 +700,9 @@ def generate_bounds(
     if center == "last":
         start_value = input_series[-1, 0]
     elif center == "median":
-        start_value = np.median(input_series)
+        start_value = np.median(input_series,axis=0)
     elif center == "mean":
-        start_value = np.mean(input_series)
+        start_value = np.mean(input_series,axis=0)
     elif center == "min":
         start_value = np.min(input_series)
     elif center == "max":
@@ -642,7 +710,7 @@ def generate_bounds(
     else:
         print("Center: not implemented.")
 
-    std = np.std(input_series)
+    std = np.std(input_series,axis=0)
 
     upper = start_value * (
             1

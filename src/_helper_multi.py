@@ -5,29 +5,10 @@ from sklearn.preprocessing import MinMaxScaler
 
 
 class DataLoader:
-    """
-    Load data into desired formats for training/validation/testing, including preprocessing.
-    """
-
-    def __init__(self, horizon, back_horizon):
-        self.horizon = horizon
-        self.back_horizon = back_horizon
-        self.scaler = list()
-
-class DataLoader:
     def __init__(self, horizon, back_horizon):
         self.horizon = horizon
         self.back_horizon = back_horizon
         self.scaler = []
-
-import numpy as np
-from sklearn.preprocessing import MinMaxScaler
-
-class DataLoader:
-    def __init__(self, horizon, back_horizon):
-        self.horizon = horizon
-        self.back_horizon = back_horizon
-        self.scalers = []
 
     def preprocessing_multi(
         self,
@@ -57,11 +38,14 @@ class DataLoader:
                 (int((train_size + val_size) * valid_steps_sample) - self.horizon):
             ]
             if normalize:
+                self.scaler.append([])
                 for i in range(n_features):
-                    scaler = MinMaxScaler(feature_range=(0, 1), clip=False)
+                    scaler = MinMaxScaler(feature_range=(0, 1), clip=True)
                     train[:, i] = scaler.fit_transform(train[:, i].reshape(-1, 1)).flatten()
                     val[:, i] = scaler.transform(val[:, i].reshape(-1, 1)).flatten()
                     test[:, i] = scaler.transform(test[:, i].reshape(-1, 1)).flatten()
+                    self.scaler[idx].append(scaler)
+
             train_lst.append(train)
             val_lst.append(val)
             test_lst.append(test)
@@ -344,12 +328,12 @@ def remove_paddings(cf_samples, padding_size):
 def forecast_metrics(dataset, Y_pred):
     X_test_original, Y_test_original, Y_pred_original = list(), list(), list()
     for i in range(dataset.Y_test.shape[0]):
-        idx = dataset.test_idxs[i]
-        X_test_original.append(dataset.scaler[idx].inverse_transform(dataset.X_test[i]))
-        Y_test_original.append(dataset.scaler[idx].inverse_transform(dataset.Y_test[i]))
-        Y_pred_original.append(
-            dataset.scaler[idx].inverse_transform(Y_pred[i].reshape(-1, 1))
-        )
+        for i2 in range(dataset.Y_test.shape[2]):
+            idx = dataset.test_idxs[i]
+            X_test_original.append(dataset.scaler[idx][i2].inverse_transform(dataset.X_test[i][:,i2].reshape(-1,1)).flatten())
+            Y_test_original.append(dataset.scaler[idx][i2].inverse_transform(dataset.Y_test[i][:,i2].reshape(-1,1)).flatten())
+            Y_pred_original.append(dataset.scaler[idx][i2].inverse_transform(Y_pred[i][:,i2].reshape(-1,1)).flatten())
+
     X_test_original, Y_test_original, Y_pred_original = (
         np.array(X_test_original),
         np.array(Y_test_original),
@@ -404,12 +388,12 @@ def cf_metrics(
     cumsum_auc, cumsum_valid_steps, cumsum_counts = cumulative_valid_steps(
         pred_values=z_preds, max_bounds=desired_max_lst, min_bounds=desired_min_lst
     )
-    slope_diff = slope_difference(
-        X_originals=X_test, X_CFs=cf_samples, input_indices=input_indices
-    )
-    slope_diff_preds = slope_difference_preds(
-        cf_preds=z_preds, label_indices=label_indices, upper_bounds=desired_max_lst
-    )
+    #slope_diff = slope_difference(
+    #    X_originals=X_test, X_CFs=cf_samples, input_indices=input_indices
+    #)
+    #slope_diff_preds = slope_difference_preds(
+    #    cf_preds=z_preds, label_indices=label_indices, upper_bounds=desired_max_lst
+    #)
 
     return (
         validity,
@@ -418,20 +402,26 @@ def cf_metrics(
         cumsum_valid_steps,
         cumsum_counts,
         cumsum_auc,
-        slope_diff,
-        slope_diff_preds,
+        #slope_diff,
+        #slope_diff_preds,
     )
 
 
 def euclidean_distance(X, cf_samples, average=True):
-    paired_distances = np.linalg.norm(X - cf_samples, axis=1)
+    if X.shape[1] != cf_samples.shape[1]:
+        paired_distances = np.linalg.norm(X.reshape(X.shape[0],X.shape[1] * X.shape[2],1) - cf_samples, axis=1)
+    else:
+        paired_distances = np.linalg.norm(X - cf_samples, axis=1)
     return np.mean(paired_distances) if average else paired_distances
 
 
 # originally from: https://github.com/isaksamsten/wildboar/blob/859758884677ba32a601c53a5e2b9203a644aa9c/src/wildboar/metrics/_counterfactual.py#L279
 def compactness_score(X, cf_samples):
     # absolute tolerance atol=0.01, 0.001, OR 0.0001?
-    c = np.isclose(X, cf_samples, atol=0.01)
+    if X.shape[1] != cf_samples.shape[1]:
+        c = np.isclose(X.reshape(X.shape[0],X.shape[1] * X.shape[2],1), cf_samples, atol=0.01)
+    else:
+        c = np.isclose(X, cf_samples, atol=0.01)
     compact_lst = np.mean(c, axis=1)
     return compact_lst.mean()
 
@@ -452,14 +442,15 @@ def cumulative_valid_steps(pred_values, max_bounds, min_bounds):
     for i in range(input_array.shape[0]):
         step_counts = 0
         for step in range(input_array.shape[1]):
-            if input_array[i, step] == True:
-                step_counts += 1
-                until_steps_valid[i] = step_counts
-            elif input_array[i, step] == False:
-                until_steps_valid[i] = step_counts
-                break
-            else:
-                print("Wrong input: cumulative_valid_steps.")
+            for feature in range(input_array.shape[2]):
+                if input_array[i, step, feature] == True:
+                    step_counts += 1
+                    until_steps_valid[i] = step_counts
+                elif input_array[i, step, feature] == False:
+                    until_steps_valid[i] = step_counts
+                    break
+                else:
+                    print("Wrong input: cumulative_valid_steps.")
 
     valid_steps, counts = np.unique(until_steps_valid, return_counts=True)
     cumsum_counts = np.flip(np.cumsum(np.flip(counts)))
@@ -492,13 +483,14 @@ def fillna_cumsum_counts(n_steps_total, valid_steps, cumsum_counts):
 def slope_difference(X_originals, X_CFs, input_indices):
     slope_lst = list()
     for i in range(len(X_originals)):
-        slope, intercept = np.polyfit(
-            input_indices, remove_extra_dim(X_originals[i]), 1
-        )
-        slope2, intercept2 = np.polyfit(input_indices, remove_extra_dim(X_CFs[i]), 1)
-        slope_diff = slope2 - slope
+        for i2 in range(len(X_originals.shape[1])):
+            slope, intercept = np.polyfit(
+                input_indices, X_originals[i], 1
+            )
+            slope2, intercept2 = np.polyfit(input_indices, remove_extra_dim(X_CFs[i]), 1)
+            slope_diff = slope2 - slope
 
-        slope_lst.append(slope_diff)
+            slope_lst.append(slope_diff)
 
     return slope_lst
 
